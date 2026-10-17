@@ -64,6 +64,15 @@ dsh plugin --profile <profile> add github:aiignite/dsh-opencode-bridge
 
 运行状态写在 `<dataDir>/status.json`，运行时日志在 `<dataDir>/bridge.log`。
 
+## 故障排查
+
+| 现象 | 处理 |
+| --- | --- |
+| 首次启动一直停在“正在下载 OpenCode” | 直接下载在部分网络下会卡住：用 `config.binaryPath` 指向已有的 `opencode.exe`，或手动放到 `<dataDir>/runtime/<版本>/opencode.exe` 后重启 |
+| 模型选择器里没有分组 | 重启 DSH；设置页需要刷新一次页面才会出现 |
+| 设置页显示“异常” | 看 `<dataDir>/bridge.log` 末尾与 `status.json` 的 `lastError` |
+| 所有免费模型都报 429 | 上游匿名额度限流，稍后重试或换网络出口 |
+
 ## 已知限制
 
 - **没有逐字流式输出。** 每次调用要求模型通过结构化信封一次性返回最终答复；
