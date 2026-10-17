@@ -1,0 +1,57 @@
+{
+  "name": "dsh-opencode-bridge",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "DeepSeek Harness plugin: OpenCode Zen free models through an isolated, real opencode runtime",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aiignite/dsh-opencode-bridge.git"
+  },
+  "homepage": "https://github.com/aiignite/dsh-opencode-bridge#readme",
+  "bugs": {
+    "url": "https://github.com/aiignite/dsh-opencode-bridge/issues"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "opencode",
+    "opencode-zen",
+    "free-models",
+    "llm-adapter"
+  ],
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "lib/*.js",
+    "locale/*.json",
+    "icon.svg",
+    "NOTICE.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  }
+}

@@ -1,0 +1,9 @@
+node_modules/
+*.tgz
+*.log
+.env
+.env.*
+.DS_Store
+opencode-runtime/
+.opencode-test/
+.opencode-bin/

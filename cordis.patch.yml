@@ -1,0 +1,5 @@
+# OpenCode 免费模型桥：注册一个原生 LlmAdapter。
+# 首次启动会自动下载官方 opencode 运行时（也可用 config.binaryPath 指定）。
+- insert:
+    - id: opencode-bridge
+      name: dsh-opencode-bridge

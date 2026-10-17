@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "OpenCode 免费模型桥接",
+    "description": "在本机拉起隔离的真实 opencode 运行时，把 OpenCode Zen 的免费模型注册成 Harness 的 opencode-bridge 模型分组。"
+  }
+}

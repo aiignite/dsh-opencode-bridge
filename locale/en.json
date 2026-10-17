@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "OpenCode Free Models Bridge",
+    "description": "Runs an isolated real opencode runtime locally and exposes its free OpenCode Zen models as the opencode-bridge provider group."
+  }
+}
