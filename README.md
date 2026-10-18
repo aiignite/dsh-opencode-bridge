@@ -53,6 +53,7 @@ dsh plugin --profile <profile> add github:aiignite/dsh-opencode-bridge
   config:
     dataDir: 'D:\dsh-data\opencode-bridge'   # 运行时、日志、状态目录
     binaryPath: 'C:\path\to\opencode.exe'    # 已有二进制时跳过下载
+    proxy: 'http://127.0.0.1:7891'           # 出站代理（免费层对地区敏感）
     images: false                            # 见「已知限制」
 ```
 
@@ -60,17 +61,43 @@ dsh plugin --profile <profile> add github:aiignite/dsh-opencode-bridge
 | --- | --- | --- |
 | `dataDir` | `<DSH_HOME>/opencode-bridge` | 运行时与日志目录 |
 | `binaryPath` | 自动下载 | 指定现成的 opencode 可执行文件 |
+| `proxy` | 无 | 作为 `HTTP(S)_PROXY` 传给运行时子进程 |
 | `images` | `false` | 图片转 base64 转发（当前上游会 400） |
 
 运行状态写在 `<dataDir>/status.json`，运行时日志在 `<dataDir>/bridge.log`。
+
+## 凭据：Zen 免费层现在需要登录
+
+上游自 2026-10-15 起对免费层做了**凭据风控**：没有 Zen 账号凭据的请求，无论来自真实
+CLI 还是本插件，一律返回 `403 FreeTierError`。另外实测**出口地区也会影响判定**——
+中国大陆直连会被判为不可用，需要经非 CN 出口。
+
+插件启动时会自动把 `auth.json` 里的 `opencode` 条目播种进隔离运行时，只挑这一个
+provider，其它密钥（GitHub Copilot 等）不会被复制。查找顺序：
+
+1. `OPENCODE_AUTH_JSON` 指向的文件
+2. `$XDG_DATA_HOME/opencode/auth.json`
+3. `~/.local/share/opencode/auth.json`
+4. `~/.opencode/auth.json`、`%LOCALAPPDATA%\opencode\auth.json`
+
+```json
+{ "opencode": { "type": "api", "key": "oc_sk_..." } }
+```
+
+`GET /api/opencode-bridge/status` 里的 `credential` 字段会显示 `seeded` / `missing`。
+
+> **免登录已不可行**：全新无凭据 profile 用官方 CLI 复现同样 403。若你所在网络无法经
+> 代理出网，则免费通道不可用（可改用其它 provider）。
 
 ## 故障排查
 
 | 现象 | 处理 |
 | --- | --- |
+| 所有模型报 403 FreeTierError | 缺 Zen 凭据：按上面「凭据」一节把 `opencode` 条目写进 `auth.json`，状态接口应显示 `credential: seeded` |
+| 仍然 403，但凭据已 seeded | 出口地区问题：配置 `config.proxy` 走非 CN 出口后重试 |
 | 首次启动一直停在“正在下载 OpenCode” | 直接下载在部分网络下会卡住：用 `config.binaryPath` 指向已有的 `opencode.exe`，或手动放到 `<dataDir>/runtime/<版本>/opencode.exe` 后重启 |
+| `opencode auth login` / `models` 崩溃 | 已知问题：部分机器（无 AVX 指令集的 CPU）上 Bun 运行时会段错误。`serve` 不受影响，可先用 `serve`；需要 CLI 时换更早的版本 |
 | 模型选择器里没有分组 | 重启 DSH；设置页需要刷新一次页面才会出现 |
-| 设置页显示“异常” | 看 `<dataDir>/bridge.log` 末尾与 `status.json` 的 `lastError` |
 | 所有免费模型都报 429 | 上游匿名额度限流，稍后重试或换网络出口 |
 
 ## 已知限制

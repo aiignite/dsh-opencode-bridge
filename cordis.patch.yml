@@ -1,5 +1,11 @@
 # OpenCode 免费模型桥：注册一个原生 LlmAdapter。
 # 首次启动会自动下载官方 opencode 运行时（也可用 config.binaryPath 指定）。
+#
+# Zen 免费层校验登录凭据，且对出口地区敏感（CN 直连会被判为不可用）。
+# config.proxy 会作为 HTTP(S)_PROXY 传给运行时子进程；config.credentialPath
+# 可指定 auth.json 位置（插件会自动把其中的 opencode 条目种进隔离运行时）。
 - insert:
     - id: opencode-bridge
       name: dsh-opencode-bridge
+      config:
+        proxy: 'http://127.0.0.1:7891'

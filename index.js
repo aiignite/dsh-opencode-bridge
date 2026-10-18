@@ -10,7 +10,7 @@
  */
 
 import { createWriteStream } from 'node:fs'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -25,6 +25,67 @@ const PROVIDER_LABEL = 'OpenCode 免费模型'
 const REFRESH_MS = 10 * 60 * 1000
 
 export const inject = ['llm']
+
+/**
+ * 出站代理环境变量。
+ *
+ * Zen 免费层对出口地区敏感（CN 直连会被判为 free tier 不可用），因此这里把
+ * `config.proxy` 转成运行时子进程能识别的 HTTP(S)_PROXY。只转发给定的那一个，
+ * 不从宿主环境继承其它代理设置。
+ */
+function proxyEnvOf(proxy) {
+  const value = typeof proxy === 'string' ? proxy.trim() : ''
+  if (!value) return {}
+  return { HTTPS_PROXY: value, HTTP_PROXY: value }
+}
+
+/* ------------------------------------------------------------------ */
+/* 凭据                                                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 用户自己的 opencode 凭据文件，按 opencode 的查找顺序。
+ * 只读取 `opencode` 这一个 provider 条目，其余密钥绝不复制。
+ */
+function credentialSources() {
+  const home = homedir()
+  const candidates = [
+    process.env.OPENCODE_AUTH_JSON,
+    process.env.XDG_DATA_HOME ? join(process.env.XDG_DATA_HOME, 'opencode', 'auth.json') : undefined,
+    join(home, '.local', 'share', 'opencode', 'auth.json'),
+    join(home, '.opencode', 'auth.json'),
+    process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'opencode', 'auth.json') : undefined,
+  ]
+  return candidates.filter(Boolean)
+}
+
+/**
+ * 把 Zen 凭据种进隔离运行时。
+ *
+ * 上游免费层已改为校验登录凭据（无凭据一律 403 FreeTierError），而本插件刻意
+ * 与用户自己的 opencode 安装隔离，因此这里只挑 `opencode` 一个条目复制进去。
+ *
+ * @returns {Promise<'seeded'|'missing'>}
+ */
+async function seedCredential(dataDir, logger) {
+  const target = join(dataDir, 'opencode', 'data', 'opencode', 'auth.json')
+  for (const source of credentialSources()) {
+    let parsed
+    try {
+      // 去掉 BOM：Windows PowerShell 写出的 UTF-8 带 BOM，会让 JSON.parse 失败。
+      parsed = JSON.parse((await readFile(source, 'utf8')).replace(/^﻿/, ''))
+    } catch {
+      continue
+    }
+    const entry = parsed?.opencode
+    if (!entry || typeof entry !== 'object') continue
+    await mkdir(join(target, '..'), { recursive: true })
+    await writeFile(target, JSON.stringify({ opencode: entry }, null, 2), { encoding: 'utf8', mode: 0o600 })
+    logger?.info?.('opencode-bridge: 已把 OpenCode 凭据种入隔离运行时')
+    return 'seeded'
+  }
+  return 'missing'
+}
 
 /* ------------------------------------------------------------------ */
 /* 模型 id                                                             */
@@ -366,6 +427,7 @@ export function apply(ctx, config = {}) {
   const status = {
     phase: 'starting',
     version: '',
+    credential: 'unknown',
     lastError: '',
     startedAt: Date.now(),
     writtenAt: new Date().toISOString(),
@@ -398,6 +460,8 @@ export function apply(ctx, config = {}) {
             provider: PROVIDER,
             phase: status.phase,
             version: status.version,
+            credential: status.credential,
+            proxy: config.proxy ?? null,
             models: catalog.length,
             ids: catalog.map(model => exposedID(model.id)),
             uptimeMs: Date.now() - status.startedAt,
@@ -459,7 +523,8 @@ export function apply(ctx, config = {}) {
     try {
       const binaryPath = config.binaryPath
         || await findRuntime(dataDir, message => logger?.info?.(`opencode-bridge: ${message}`))
-      const runtime = await startBackend(binaryPath, dataDir, logStream)
+      status.credential = await seedCredential(dataDir, logger)
+      const runtime = await startBackend(binaryPath, dataDir, logStream, proxyEnvOf(config.proxy))
       if (disposed) {
         await runtime.stop()
         return
